@@ -15,7 +15,6 @@ import sys
 import math
 from shutil import rmtree
 import os
-from string import join
 import shutil
 import time
 import h5py
@@ -71,8 +70,8 @@ class FirnDensitySpin:
             jsonString = f.read()
             self.c = json.loads(jsonString)
 
-        print 'Spin run started'
-        print "physics are", self.c['physRho']
+        print('Spin run started')
+        print("physics are", self.c['physRho'])
 
         # create directory to store results. Deletes if it exists already.
         if os.path.exists(self.c['resultsFolder']):
@@ -90,16 +89,16 @@ class FirnDensitySpin:
         ### accumulation rate
         input_bdot, input_year_bdot = read_input(self.c['InputFileNamebdot'])
         self.bdot0 = input_bdot[0] #Make sure that this is what we want!
-        
+
         ### could include others, e.g. surface density
         ##########
 
-        
+
         ##### set up model grid
         self.gridLen    = int((self.c['H'] - self.c['HbaseSpin']) / (self.bdot0 / self.c['stpsPerYearSpin'])) # number of grid points
         gridHeight      = np.linspace(self.c['H'], self.c['HbaseSpin'], self.gridLen)
         self.z          = self.c['H'] - gridHeight
-        self.dz         = np.diff(self.z) 
+        self.dz         = np.diff(self.z)
         self.dz         = np.append(self.dz, self.dz[-1])
         self.dx         = np.ones(self.gridLen)
 
@@ -112,8 +111,8 @@ class FirnDensitySpin:
         self.iso_sigma = iso_diffusion_vas.Sigma(P = self.c['P_atm'], rho_o = self.c['rhos0'], \
             rho_co = self.c['rho_co_iso']).analytical_HL(rho_array = self.rho, T = THL, accum_ice = AHL)
 
-        print self.iso_sigma['D'][0]
-        print 'blablabla'
+        print(self.iso_sigma['D'][0])
+        print('blablabla')
 
         # plt.figure(1)
         # plt.plot(self.z, self.iso_sigma['D'])
@@ -127,13 +126,13 @@ class FirnDensitySpin:
                 zz          = np.min(self.z[self.rho > 850.0])
                 self.years  = int(zz / self.bdot0)
             except ValueError:
-                print "auto spin up error; using spin up time from json"
+                print("auto spin up error; using spin up time from json")
                 self.years = self.c['yearSpin'] # number of years to spin up for
         else: # based on time taken to spin up in the config file.
 
 
             self.years = self.c['yearSpin'] # number of years to spin up for
-        
+
         self.dt = S_PER_YEAR / self.c['stpsPerYearSpin']
         self.stp = int(self.years*S_PER_YEAR/self.dt)
         self.t =  1.0 / self.c['stpsPerYearSpin'] # years per time step
@@ -143,7 +142,7 @@ class FirnDensitySpin:
         # # self.dts        = self.years / self.stp # size of time step, years
         # self.t          = 1.0 / self.c['stpsPerYearSpin'] # years per time step
 
-        
+
         # print 'dts', self.dts
         # print 't', self.t
         #####
@@ -167,7 +166,7 @@ class FirnDensitySpin:
                 input_iso, input_year_iso = read_input(self.c['InputFileNameIso'])
                 del_s0 = input_iso[0]
             except:
-                print 'No external file for surface isotope values found, but you specified in the config file that isotope diffusion is on. The model will generate its own synthetic isotope data for you.'
+                print('No external file for surface isotope values found, but you specified in the config file that isotope diffusion is on. The model will generate its own synthetic isotope data for you.')
                 del_s0 = -50.0
 
             self.del_s = del_s0 * np.ones(self.stp)
@@ -175,8 +174,8 @@ class FirnDensitySpin:
             self.del_z = init_del_z
         else:
             self.del_s = None
-            init_del_z = None    
-        
+            init_del_z = None
+
 
         ### Surface Density
         self.rhos0      = self.c['rhos0'] * np.ones(self.stp)
@@ -194,7 +193,7 @@ class FirnDensitySpin:
         if self.c['strain']:
             self.du_dx = np.zeros(self.gridLen)
             self.du_dx[1:] = self.c['du_dx']/(S_PER_YEAR)
-        
+
         ### set up initial temperature grid as well as a class to handle heat/isotope diffusion
         # self.diffu      = Diffusion(self.z, self.stp, self.gridLen, init_Tz, init_del_z) # is this the best way to do this?
         self.Tz         = init_Tz
@@ -219,9 +218,9 @@ class FirnDensitySpin:
         else:
             self.THist = False
 
-        print 'Ts', self.Ts[-4:]
-        print 'bdot_s', self.bdotSec[-4:]
-        print 'dt', self.dt
+        print('Ts', self.Ts[-4:])
+        print('bdot_s', self.bdotSec[-4:])
+        print('dt', self.dt)
 
 
     ##### END INIT #####
@@ -229,14 +228,14 @@ class FirnDensitySpin:
     def time_evolve(self):
         '''
         Evolve the spatial grid, time grid, accumulation rate, age, density, mass, stress, and temperature through time
-        based on the user specified number of timesteps in the model run. Updates the firn density using a user specified 
+        based on the user specified number of timesteps in the model run. Updates the firn density using a user specified
         '''
         self.steps = 1 / self.t #this is time steps per year
 
         ####################################
         ##### START TIME-STEPPING LOOP #####
         ####################################
-        for iii in xrange(self.stp):
+        for iii in range(self.stp):
             # the parameters that get passed to physics
             PhysParams = {
                 'iii':          iii,
@@ -284,24 +283,25 @@ class FirnDensitySpin:
             try:
                 RD = physicsd[self.c['physRho']]()
                 drho_dt = RD['drho_dt']
+                self.drho_dt = drho_dt
             except KeyError:
-                print "Error at line ", info.lineno
+                print("Error at line ", info.lineno)
 
             ### Calculate dsigma2_dt for isotope diffusion 20171010
-            dsigma2_dt = iso_diffusion_vas.Sigma2Prime(params_dict = self.c, physical_param_dict = PhysParams).dsigma2_dt(drho_dt = drho_dt, \
+            self.dsigma2_dt = iso_diffusion_vas.Sigma2Prime(params_dict = self.c, physical_param_dict = PhysParams).dsigma2_dt(drho_dt = drho_dt, \
                 iso_sigma_dict = self.iso_sigma)
-            
-            
+
+
 
             ### update density and age of firn
             self.age = np.concatenate(([0], self.age[:-1])) + self.dt
             self.rho = self.rho + self.dt * drho_dt
-            
+
 
             ### Update isotope diffusion lengths 20171010
-            sigmaD_new = self.iso_sigma['D']**2     + self.dt*dsigma2_dt['D']
-            sigma18_new = self.iso_sigma['18']**2   + self.dt*dsigma2_dt['18'] 
-            sigma17_new = self.iso_sigma['17']**2   + self.dt*dsigma2_dt['17']
+            sigmaD_new = self.iso_sigma['D']**2     + self.dt*self.dsigma2_dt['D']
+            sigma18_new = self.iso_sigma['18']**2   + self.dt*self.dsigma2_dt['18']
+            sigma17_new = self.iso_sigma['17']**2   + self.dt*self.dsigma2_dt['17']
 
 
 
@@ -320,11 +320,11 @@ class FirnDensitySpin:
             dzNew = self.bdotSec[iii] * RHO_I / self.rhos0[iii] * S_PER_YEAR
             self.dz = self.mass / self.rho * self.dx
             # consider additional change in box height due to longitudinal strain rate
-            self.dz_old = self.dz    
+            self.dz_old = self.dz
             # self.dz = self.du_dx*self.dt + self.dz_old
             self.dz = np.concatenate(([dzNew], self.dz[:-1]))
             if self.c['strain']:
-                self.dz = ((-self.du_dx)*self.dt + 1)*self.dz   
+                self.dz = ((-self.du_dx)*self.dt + 1)*self.dz
             self.z = self.dz.cumsum(axis = 0)
             self.z = np.concatenate(([0], self.z[:-1]))
             self.rho  = np.concatenate(([self.rhos0[iii]], self.rho[:-1]))
@@ -333,8 +333,8 @@ class FirnDensitySpin:
             sigma18_new = np.concatenate(([0.], np.sqrt(sigma18_new[:-1])))
             sigma17_new = np.concatenate(([0.], np.sqrt(sigma17_new[:-1])))
             self.iso_sigma = {'D': sigmaD_new, '18': sigma18_new, '17':sigma17_new}
-            
-        
+
+
 
             ##### update mass, stress, and mean accumulation rate
             if self.c['strain']:
@@ -355,12 +355,16 @@ class FirnDensitySpin:
 
 
                 rho_time        = np.concatenate(([self.t * iii + 1], self.rho))
+                drho_dt_time    = np.concatenate(([self.t * iii + 1], self.drho_dt))
                 Tz_time         = np.concatenate(([self.t * iii + 1], self.Tz))
                 age_time        = np.concatenate(([self.t * iii + 1], self.age))
                 z_time          = np.concatenate(([self.t * iii + 1], self.z))
-                iso_sigmaD_time  = np.concatenate(([self.t * iii + 1], self.iso_sigma['D']))
-                iso_sigma18_time  = np.concatenate(([self.t * iii + 1], self.iso_sigma['18']))
-                iso_sigma17_time  = np.concatenate(([self.t * iii + 1], self.iso_sigma['17']))
+                iso_dsigma2_dt_D_time = np.concatenate(([self.t * iii + 1], self.dsigma2_dt['D']))
+                iso_dsigma2_dt_18_time = np.concatenate(([self.t * iii + 1], self.dsigma2_dt['18']))
+                iso_dsigma2_dt_17_time = np.concatenate(([self.t * iii + 1], self.dsigma2_dt['17']))
+                iso_sigmaD_time = np.concatenate(([self.t * iii + 1], self.iso_sigma['D']))
+                iso_sigma18_time = np.concatenate(([self.t * iii + 1], self.iso_sigma['18']))
+                iso_sigma17_time = np.concatenate(([self.t * iii + 1], self.iso_sigma['17']))
 
                 # plt.figure(1)
                 # plt.plot(self.z, self.iso_sigma['D'])
@@ -375,7 +379,7 @@ class FirnDensitySpin:
                     r2_time     = np.concatenate(([self.t * iii + 1], self.r2))
                 else:
                     r2_time     = None
-                if self.THist:                
+                if self.THist:
                     Hx_time     = np.concatenate(([self.t * iii + 1], self.Hx))
                 else:
                     Hx_time     = None
@@ -385,7 +389,8 @@ class FirnDensitySpin:
                     iso_time    = None
 
 
-                write_spin_hdf5(self.c['resultsFolder'], self.c['spinFileName'], self.c['physGrain'], self.THist, self.c['isoDiff'], rho_time, Tz_time, age_time, z_time, \
-                    iso_sigmaD_time, iso_sigma18_time, iso_sigma17_time, r2_time, Hx_time, iso_time)
+                write_spin_hdf5(self.c['resultsFolder'], self.c['spinFileName'], self.c['physGrain'], self.THist, self.c['isoDiff'], rho_time, drho_dt_time, \
+                Tz_time, age_time, z_time, iso_sigmaD_time, iso_sigma18_time, iso_sigma17_time, iso_dsigma2_dt_D_time,\
+                iso_dsigma2_dt_18_time, iso_dsigma2_dt_17_time, r2_time, Hx_time, iso_time)
                 # write_spin(self.c['resultsFolder'], self.c['physGrain'], rho_time, Tz_time, age_time, z_time, r2_time)
-                print 'dz', self.dz[0:10]
+                print('dz', self.dz[0:10])

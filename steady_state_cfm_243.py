@@ -9,6 +9,16 @@ import string
 import h5py
 import shutil
 import time
+import diffusivity_vas
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
+# plt.rc('font', size = 12)
+plt.rc('xtick', direction = 'in')
+plt.rc('ytick', direction = 'in')
+mylabelsize = 14
+plt.rc('ytick', labelsize = mylabelsize)
+plt.rc('xtick', labelsize = mylabelsize)
+plt.rc('axes', labelsize = mylabelsize)
 
 def run_st_st(configName = "./vas_simple_tests_st_st.json", temp = 243.15, \
 accum = 0.20, years = 1000, physRho = "Goujon2003", **kwargs):
@@ -36,7 +46,7 @@ accum = 0.20, years = 1000, physRho = "Goujon2003", **kwargs):
     c["InputFileNamebdot"] = "cfm_mytests/cfm_my_forcings/accum_forcing_st_st.csv"
     c["resultsFolder"] = "cfm_mytests/steady_state_test_results_temp/"
     c["physRho"] = physRho
-    c["resultsFileName"] = "steady_state_test_" + string.replace(str(np.round(temp, 2)), ".", "_") + "_" + string.replace(str(np.round(accum, 3)), ".", "_")\
+    c["resultsFileName"] = "steady_state_test_" + str(np.round(temp, 2)).replace(".", "_") + "_" + str(np.round(accum, 4)).replace(".", "_")\
      + "_" + physRho + ".hdf5"
 
     if len(kwargs.keys()) != 0:
@@ -77,7 +87,7 @@ def read_st_st_test():
 
         str_list_incl = ["hdf5", "Goujon"]
         if np.all([k in fil for k in str_list_incl]):
-            print fil
+            print(fil)
             f = h5py.File(os.path.join(results_folder, fil))
             # print f.keys()
             z = f["depth"][:]
@@ -127,9 +137,9 @@ def export_st_st_sigmas(rho_phys = "HLdynamic"):
             continue
 
         #list of strings to be included in file name
-        str_list_incl = ["hdf5", rho_phys, "seas"]
+        str_list_incl = ["hdf5", rho_phys, "Lamb"]
         if np.all([k in fil for k in str_list_incl]):
-            print fil
+            print(fil)
             f = h5py.File(os.path.join(results_folder, fil))
             # print f.keys()
             z = f["depth"][-1]
@@ -151,34 +161,70 @@ def export_st_st_sigmas(rho_phys = "HLdynamic"):
             sigma17_co = np.append(sigma17_co, iso_sigma17[rho>rho_co][0])
             sigma18_co = np.append(sigma18_co, iso_sigma18[rho>rho_co][0])
             sigma_D_co = np.append(sigma_D_co, iso_sigmaD[rho>rho_co][0])
-    print temp_array
-    print accum_array
-    print age_co_array
+    print(temp_array)
+    print(accum_array)
+    print(age_co_array)
 
     dataout = np.transpose(np.vstack((temp_array, accum_array, depth_co_array, age_co_array, \
         sigma17_co, sigma18_co, sigma_D_co)))
     f = open("./cfm_mytests/export_st_st_sigmas.out", "w")
     f.write(model_list[-1] + "\n")
     f.write("temp\taccum\tdepth_co\tage_co\tsigma17_co\tsigma18_co\tsigmaD_co\n")
-    np.savetxt(f, dataout, fmt = "%0.3f\t%0.5f\t%0.3f\t%0.2f\t%0.4f\t%0.4f\t%0.4f")
+    np.savetxt(f, dataout, fmt = "%0.4f\t%0.6f\t%0.4f\t%0.4f\t%0.5f\t%0.5f\t%0.5f")
     f.close()
 
     return
 
+def plot_profiles_eq_terms():
+    f = h5py.File("./cfm_mytests/steady_state_test_results/steady_state_test_243_15_0_2_HLdynamic.hdf5")
+    print(f.keys())
+    z = f["depth"][-1][1:]
+    rho = f["density"][-1][1:]
+    temperature = f["temperature"][-1]
+    age = f["age"][-1]
+    climate = f["Modelclimate"][:]
+    iso_sigmaD = f["iso_sigmaD"][-1]
+    iso_sigma18 = f["iso_sigma18"][-1][1:]
+    iso_sigma17 = f["iso_sigma17"][-1]
+    drho_dt = f["drho_dt"][-1][1:]
+    iso_dsigma2_dt_18 = f["iso_dsigma2_dt_18"][-1][1:]
+    print(rho)
+
+    plt.ion()
+    plt.close("all")
+    f1, axess = plt.subplots(nrows = 1, ncols = 1 , num = 567, figsize = (10,6), tight_layout = True)
+    axess.plot(z, iso_dsigma2_dt_18, linewidth = 1, color = "r")
+    axess.plot(z, drho_dt*iso_sigma18**2/rho, linewidth = 1, color = "b")
+    axess.plot(z, iso_dsigma2_dt_18/2 + drho_dt*iso_sigma18**2/rho, linewidth = 1, color = "k")
+    # axess.plot(z, iso_sigma18, linewidth = 1, color = "r")
+    run_st_st(physRho = "HLdynamic", tortuosity = "johnsen2000")
+
+    return
 
 
-
-
+#
 if __name__ == "__main__":
-    # run_st_st()
-    t1 = time.time()
-    # b = np.logspace(np.log(0.015),np.log(0.3), 8, base = np.e)
-    # a = np.linspace(213.0, 253, 8)
-    # print(a)
-    # print(b)
-    #for i in range(len(a)):
-    #    run_st_st(temp = a[i], accumu_w = b[i], years = 400)
-    # export_st_st_sigmas(rho_phys = "Goujon")
-    # read_st_st_test()
-    run_st_st(temp = 250.0)
-    print("\n\nScript time: %0.2f minutes" %((time.time() - t1)/60.))
+    run_st_st(physRho = "HLdynamic", tortuosity = "johnsen2000")
+    plot_profiles_eq_terms()
+    # os.remove("./steady_state_test_results_temp/steady_state_test_243_15_0_2_HLdynamic.hdf5")
+#     t1 = time.time()
+#     b = np.logspace(np.log(0.015),np.log(0.3), 30, base = np.e)
+#     a = np.linspace(213.0, 253, 30)
+#     print(a)
+#     print(b)
+#     fout = open("./f_factors.dat", "w")
+#     fout.write("Temperature\talpha_D_merlivat\talpha_D_ellehoj\talpha_D_lamb\talpha_18_majoube\talpha_18_ellehoj\talpha_17_majoube\talpha_17_ellehoj\n")
+#     for i in range(len(a)):
+#         dif_inst = diffusivity_vas.FirnDiffusivity(rho = 550.0, P = 0.7, T = a[i])
+#         dataout = np.transpose(np.vstack((a[i], dif_inst.deuterium(f_factor_version = "Merlivat"),\
+#         dif_inst.deuterium(f_factor_version = "Ellehoj"), dif_inst.deuterium(f_factor_version = "Lamb"),\
+#         dif_inst.o18(f_factor_version = "Majoube"), dif_inst.o18(f_factor_version = "Ellehoj"),\
+#         dif_inst.o17(f_factor_version = "Majoube"), dif_inst.o17(f_factor_version = "Ellehoj"))))
+#         print(dataout)
+#         np.savetxt(fout, dataout, fmt = "%0.6e", delimiter = "\t")
+#     #    run_st_st(temp = a[i], accum = b[i], years = 500, physRho = "HLdynamic")
+#     # export_st_st_sigmas(rho_phys = "HLdynamic")
+# #     # read_st_st_test()
+#     # run_st_st(temp = 250.0, HbaseSpin = 2800)
+# #     print("\n\nScript time: %0.2f minutes" %((time.time() - t1)/60.))
+#     fout.close()

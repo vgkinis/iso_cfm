@@ -21,7 +21,6 @@ import sys
 import math
 from shutil import rmtree
 import os
-from string import join
 import shutil
 import time
 import inspect
@@ -76,26 +75,32 @@ class FirnDensityNoSpin:
         with open(configName, "r") as f:
             jsonString      = f.read()
             self.c          = json.loads(jsonString)
-        print "Main run starting"
-        print "physics are", self.c['physRho']
+        print("Main run starting")
+        print("physics are", self.c['physRho'])
 
         ### read in initial depth, age, density, temperature from spin-up results
         initDepth   = read_init(self.c['resultsFolder'], self.c['spinFileName'], 'depthSpin')
         initAge     = read_init(self.c['resultsFolder'], self.c['spinFileName'], 'ageSpin')
         initDensity = read_init(self.c['resultsFolder'], self.c['spinFileName'], 'densitySpin')
+        init_drho_dt = read_init(self.c['resultsFolder'], self.c['spinFileName'], 'drho_dtSpin')
         initTemp    = read_init(self.c['resultsFolder'], self.c['spinFileName'], 'tempSpin')
 
         ### read initial diffusion lengths
         init_iso_sigmaD = read_init(self.c['resultsFolder'] , self.c['spinFileName'], 'iso_sigmaD')
         init_iso_sigma18 = read_init(self.c['resultsFolder'] , self.c['spinFileName'], 'iso_sigma18')
         init_iso_sigma17 = read_init(self.c['resultsFolder'] , self.c['spinFileName'], 'iso_sigma17')
+        init_iso_dsigma2_dt_D = read_init(self.c['resultsFolder'] , self.c['spinFileName'], 'iso_dsigma2_dt_D')
+        init_iso_dsigma2_dt_18 = read_init(self.c['resultsFolder'] , self.c['spinFileName'], 'iso_dsigma2_dt_18')
+        init_iso_dsigma2_dt_17 = read_init(self.c['resultsFolder'] , self.c['spinFileName'], 'iso_dsigma2_dt_17')
 
         ### set up the initial age and density of the firn column
         self.age        = initAge[1:]
         self.rho        = initDensity[1:]
+        self.drho_dt    = init_drho_dt[1:]
 
         ###set up initial diffusion length dictionary as attribute
         self.iso_sigma = {'D': init_iso_sigmaD[1:], '18': init_iso_sigma18[1:], '17': init_iso_sigma17[1:]}
+        self.iso_dsigma2_dt = {'D': init_iso_dsigma2_dt_D[1:], '18': init_iso_dsigma2_dt_18[1:], '17': init_iso_dsigma2_dt_17[1:]}
 
         ### set up model grid
         self.z          = initDepth[1:]
@@ -116,10 +121,10 @@ class FirnDensityNoSpin:
         try:
             input_snowmelt, input_year_snowmelt = read_input(self.c['InputFileNamemelt'])
             MELT = True
-            print "Melt is initialized"
+            print("Melt is initialized")
         except:
             MELT = False
-            print "No melt"
+            print("No melt")
             input_snowmelt = None
             input_year_snowmelt = None
 
@@ -130,7 +135,7 @@ class FirnDensityNoSpin:
 
         self.years      = (yr_end - yr_start) * 1.0
         self.dt         = S_PER_YEAR / self.c['stpsPerYear']
-        print 'dt', self.dt/S_PER_YEAR
+        print('dt', self.dt/S_PER_YEAR)
         self.stp        = int(self.years * S_PER_YEAR/self.dt + 1)       # total number of time steps, as integer
         # self.modeltime  = np.linspace(yr_start, yr_end, self.stp + 1)   # vector of time of each model step
         self.modeltime  = np.linspace(yr_start, yr_end, self.stp)
@@ -173,10 +178,11 @@ class FirnDensityNoSpin:
             init_del_z    = read_init(self.c['resultsFolder'], self.c['spinFileName'], 'IsoSpin')
             try:
                 input_iso, input_year_iso = read_input(self.c['InputFileNameIso'])
-                self.del_s  = np.interp(self.modeltime, input_year_iso, input_iso)
+                del_s_f  = interpolate.interp1d(input_year_iso, input_iso, 'nearest', fill_value = 'extrapolate')
+                self.del_s = del_s_f(self.modeltime)
                 # del_s0 = input_iso[0]
             except:
-                print 'No external file for surface isotope values found, but you specified in the config file that isotope diffusion is on. The model will generate its own synthetic isotope data for you.'
+                print('No external file for surface isotope values found, but you specified in the config file that isotope diffusion is on. The model will generate its own synthetic isotope data for you.')
                 # del_s0 = -50.0
                 ar1 = 0.9   # red noise memory coefficient
                 std_rednoise = 2    # red noise standard deviation
@@ -194,7 +200,7 @@ class FirnDensityNoSpin:
             else:
                 self.rhos0      = self.c['rhos0'] * np.ones(self.stp)       # density at surface
         except:
-            print "you should alter the json to include variable_srho"
+            print("you should alter the json to include variable_srho")
             self.rhos0      = self.c['rhos0'] * np.ones(self.stp)       # density at surface
 
         # if MELT:
@@ -242,34 +248,42 @@ class FirnDensityNoSpin:
 
 
         ### Output list defined here
-        self.output_list = ['density','depth','temperature', 'age', 'climate', 'iso_sigmaD', 'iso_sigma18', 'iso_sigma17']
-        # self.output_list = self.c['outputs']
-        print self.output_list
-        # self.RD = {}
+        if self.c['isoDiff']:
+            self.output_list = ['density', 'drho_dt', 'depth','temperature', \
+            'age', 'climate', 'iso_sigmaD', 'iso_sigma18', 'iso_sigma17', \
+            'iso_dsigma2_dt_D', 'iso_dsigma2_dt_18', 'iso_dsigma2_dt_17', 'isotopes']
+        else:
+            self.output_list = ['density', 'drho_dt', 'depth','temperature', \
+            'age', 'climate', 'iso_sigmaD', 'iso_sigma18', 'iso_sigma17', \
+            'iso_dsigma2_dt_D', 'iso_dsigma2_dt_18', 'iso_dsigma2_dt_17']
+        print(self.output_list)
         if 'density' in self.output_list:
             self.rho_out = np.zeros((TWlen+1,len(self.dz)+1),dtype='float32')
-            self.rho_out[0,:]        = np.append(self.modeltime[0], self.rho)
+            self.rho_out[0,:] = np.append(self.modeltime[0], self.rho)
+        if 'drho_dt' in self.output_list:
+            self.drho_dt_out = np.zeros((TWlen+1,len(self.dz)+1),dtype='float32')
+            self.drho_dt_out[0,:] = np.append(self.modeltime[0], self.drho_dt)
         if 'temperature' in self.output_list:
             self.Tz_out = np.zeros((TWlen+1,len(self.dz)+1),dtype='float32')
-            self.Tz_out[0,:]         = np.append(self.modeltime[0], self.Tz)
+            self.Tz_out[0,:] = np.append(self.modeltime[0], self.Tz)
         if 'age' in self.output_list:
             self.age_out = np.zeros((TWlen+1,len(self.dz)+1),dtype='float32')
-            self.age_out[0,:]        = np.append(self.modeltime[0], self.age/S_PER_YEAR)
+            self.age_out[0,:] = np.append(self.modeltime[0], self.age/S_PER_YEAR)
         if 'depth' in self.output_list:
             self.z_out = np.zeros((TWlen+1,len(self.dz)+1),dtype='float32')
-            self.z_out[0,:]          = np.append(self.modeltime[0], self.z)
+            self.z_out[0,:] = np.append(self.modeltime[0], self.z)
         if 'dcon' in self.output_list:
             self.D_out = np.zeros((TWlen+1,len(self.dz)+1),dtype='float32')
-            self.D_out[0,:]          = np.append(self.modeltime[0], self.Dcon)
+            self.D_out[0,:] = np.append(self.modeltime[0], self.Dcon)
         if 'bdot_mean' in self.output_list:
             self.bdot_out = np.zeros((TWlen+1,len(self.dz)+1),dtype='float32')
-            self.bdot_out[0,:]       = np.append(self.modeltime[0], self.bdot_mean)
+            self.bdot_out[0,:] = np.append(self.modeltime[0], self.bdot_mean)
         if 'climate' in self.output_list:
             self.Clim_out = np.zeros((TWlen+1,3),dtype='float32')
-            self.Clim_out[0,:]       = np.append(self.modeltime[0], [self.bdot[0], self.Ts[0]])  # not sure if bdot or bdotSec
+            self.Clim_out[0,:] = np.append(self.modeltime[0], [self.bdot[0], self.Ts[0]])  # not sure if bdot or bdotSec
         if 'compaction_rate' in self.output_list:
             self.crate_out = np.zeros((TWlen+1,len(self.dz)+1),dtype='float32')
-            self.crate_out[0,:]      = np.append(self.modeltime[0], np.zeros(len(self.z)))
+            self.crate_out[0,:] = np.append(self.modeltime[0], np.zeros(len(self.z)))
         if 'iso_sigmaD' in self.output_list:
             self.iso_sigmaD_out = np.zeros((TWlen+1, len(self.dz)+1), dtype = 'float32')
             self.iso_sigmaD_out[0,:] = np.append(self.modeltime[0], self.iso_sigma['D'])
@@ -279,10 +293,19 @@ class FirnDensityNoSpin:
         if 'iso_sigma17' in self.output_list:
             self.iso_sigma17_out = np.zeros((TWlen+1, len(self.dz)+1), dtype = 'float32')
             self.iso_sigma17_out[0,:] = np.append(self.modeltime[0], self.iso_sigma['17'])
+        if 'iso_dsigma2_dt_D' in self.output_list:
+            self.iso_dsigma2_dt_D_out = np.zeros((TWlen+1, len(self.dz)+1), dtype = 'float32')
+            self.iso_dsigma2_dt_D_out[0,:] = np.append(self.modeltime[0], self.iso_dsigma2_dt['D'])
+        if 'iso_dsigma2_dt_18' in self.output_list:
+            self.iso_dsigma2_dt_18_out = np.zeros((TWlen+1, len(self.dz)+1), dtype = 'float32')
+            self.iso_dsigma2_dt_18_out[0,:] = np.append(self.modeltime[0], self.iso_dsigma2_dt['18'])
+        if 'iso_dsigma2_dt_17' in self.output_list:
+            self.iso_dsigma2_dt_17_out = np.zeros((TWlen+1, len(self.dz)+1), dtype = 'float32')
+            self.iso_dsigma2_dt_17_out[0,:] = np.append(self.modeltime[0], self.iso_dsigma2_dt['17'])
 
 
         try:
-            print 'rho_out size (MB):', self.rho_out.nbytes/1.0e6
+            print('rho_out size (MB):', self.rho_out.nbytes/1.0e6)
         except:
             pass
         # set up initial grain growth (if specified in config file)
@@ -357,7 +380,7 @@ class FirnDensityNoSpin:
         ##### START TIME-STEPPING LOOP #####
         ####################################
 
-        for iii in xrange(self.stp):
+        for iii in range(self.stp):
             mtime = self.modeltime[iii]
 
             # the parameters that get passed to physics
@@ -407,13 +430,14 @@ class FirnDensityNoSpin:
             try:
                 RD = physicsd[self.c['physRho']]()
                 drho_dt = RD['drho_dt']
+                self.drho_dt = drho_dt
             except KeyError:
-                print "Error at line ", info.lineno
+                print("Error at line ", info.lineno)
 
 
 
             ### Calculate dsigma2_dt for isotope diffusion 20171010
-            dsigma2_dt = iso_diffusion_vas.Sigma2Prime(params_dict = self.c, physical_param_dict = PhysParams).dsigma2_dt(drho_dt = drho_dt, \
+            self.dsigma2_dt = iso_diffusion_vas.Sigma2Prime(params_dict = self.c, physical_param_dict = PhysParams).dsigma2_dt(drho_dt = drho_dt, \
                 iso_sigma_dict = self.iso_sigma)
 
 
@@ -424,9 +448,9 @@ class FirnDensityNoSpin:
 
 
             ### Update isotope diffusion lengths 20171010
-            sigmaD_new = self.iso_sigma['D']**2     + self.dt*dsigma2_dt['D']
-            sigma18_new = self.iso_sigma['18']**2   + self.dt*dsigma2_dt['18']
-            sigma17_new = self.iso_sigma['17']**2   + self.dt*dsigma2_dt['17']
+            sigmaD_new = self.iso_sigma['D']**2     + self.dt*self.dsigma2_dt['D']
+            sigma18_new = self.iso_sigma['18']**2   + self.dt*self.dsigma2_dt['18']
+            sigma17_new = self.iso_sigma['17']**2   + self.dt*self.dsigma2_dt['17']
 
 
 
@@ -449,7 +473,7 @@ class FirnDensityNoSpin:
                 # print 'del_z', self.del_z[0:2]
             try:
                 if self.snowmeltSec[iii]>0:
-                   print 'melt step; ', self.snowmeltSec[iii]
+                   print('melt step; ', self.snowmeltSec[iii])
                    self.rho, self.age, self.dz, self.Tz, self.z, self.mass = percolation(self,iii)
 
             except:
@@ -508,12 +532,14 @@ class FirnDensityNoSpin:
 
             # write results as often as specified in the init method
             if mtime in self.TWrite:
-                print(mtime, self.Ts[int(iii)], self.bdot[int(iii)], self.iso_sigma['D'][-1])
+                print((mtime, self.Ts[int(iii)], self.bdot[int(iii)], self.iso_sigma['D'][-1]))
                 ind = np.where(self.TWrite == mtime)[0][0]
                 mtime_plus1 = self.TWrite[ind]
 
                 if 'density' in self.output_list:
                     self.rho_out[self.WTracker,:] = np.append(mtime_plus1, self.rho)
+                if 'drho_dt' in self.output_list:
+                    self.drho_dt_out[self.WTracker,:] = np.append(mtime_plus1, self.drho_dt)
                 if 'temperature' in self.output_list:
                     self.Tz_out[self.WTracker,:]   = np.append(mtime_plus1, self.Tz)
                 if 'age' in self.output_list:
@@ -540,6 +566,12 @@ class FirnDensityNoSpin:
                     self.iso_sigma18_out[self.WTracker,:] = np.append(mtime_plus1, self.iso_sigma['18'])
                 if 'iso_sigma17' in self.output_list:
                     self.iso_sigma17_out[self.WTracker,:] = np.append(mtime_plus1, self.iso_sigma['17'])
+                if 'iso_dsigma2_dt_D' in self.output_list:
+                    self.iso_dsigma2_dt_D_out[self.WTracker,:] = np.append(mtime_plus1, self.dsigma2_dt['D'])
+                if 'iso_dsigma2_dt_18' in self.output_list:
+                    self.iso_dsigma2_dt_18_out[self.WTracker,:] = np.append(mtime_plus1, self.dsigma2_dt['18'])
+                if 'iso_dsigma2_dt_17' in self.output_list:
+                    self.iso_dsigma2_dt_17_out[self.WTracker,:] = np.append(mtime_plus1, self.dsigma2_dt['17'])
 
                 bcoAgeMart, bcoDepMart, bcoAge815, bcoDep815 = self.update_BCO()
                 LIZAgeMart, LIZDepMart = self.update_LIZ()

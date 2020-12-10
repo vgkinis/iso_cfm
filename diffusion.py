@@ -2,6 +2,7 @@ from solver import transient_solve_TR
 from constants import *
 import numpy as np
 from scipy import interpolate
+import diffusivity_vas
 
 # class Diffusion:
 #     def __init__(self, z, stp, gridLen, init_Tz, init_del_z):
@@ -17,10 +18,10 @@ from scipy import interpolate
 #         self.Tz = init_Tz
 #         fT10m      = interpolate.interp1d(z, self.Tz) #temp at 10m depth
 #         self.T10m  = fT10m(10)
-    
+
 #         self.del_z = init_del_z  # vertical isotope profile is the initial profile set as input
 
-       
+
 
 def heatDiff(self,iii):
     '''
@@ -57,7 +58,7 @@ def heatDiff(self,iii):
 
     fT10m = interpolate.interp1d(self.z, self.Tz) 								# temp at 10m depth
     self.T10m = fT10m(10)
-    
+
     return self.Tz, self.T10m
 
 def isoDiff(self,iii):
@@ -93,7 +94,7 @@ def isoDiff(self,iii):
     # alpha_18_z = np.exp(11.839/Tz-28.224*np.power(10,-3)) 			        # alternate formulation from Eric's python code
     alpha_D_z = 0.9098 * np.exp(16288 / np.power(self.Tz, 2)) 				    # fractionation factor for D
     Po = 1.0              												        # reference pressure in atm
-    P = 1.0
+    P = 0.7
 
     # Set diffusivity in air (units of m^2/s)
     # Da = 2.1 * np.power(10.0, -5.) * np.power(self.Tz / 273.15, 1.94) * (Po / P)
@@ -107,20 +108,27 @@ def isoDiff(self,iii):
     invtau[self.rho < RHO_I / np.sqrt(b)] = 1.0 - (b * (self.rho[self.rho < RHO_I / np.sqrt(b)] / RHO_I)) ** 2
     invtau[self.rho >= RHO_I / np.sqrt(b)] = 0.0
 
+    diffusivity_inst = diffusivity_vas.FirnDiffusivity(rho = self.rho, rho_co = self.c["rho_co_iso"], \
+        T = self.Tz, P = self.c["P_atm"], p_ice_version = self.c["p_ice"], \
+        tortuosity_version = self.c["tortuosity"])
     # Set diffusivity for each isotope
     if self.c['iso'] == '18':
         D = m * pz * invtau * Da_18 * (1 / self.rho - 1 / RHO_I) / (R * self.Tz * alpha_18_z)
-        D = D + 1.5e-15
+
+        D = diffusivity_inst.o18(f_factor_version = self.c["alpha_18"])
+        D = D + 1.5e-20
         self.del_z = transient_solve_TR(z_edges_vec, z_P_vec, nt, self.dt, D, phi_0, nz_P, nz_fv, phi_s)
     elif self.c['iso'] == 'D':
         D = m * pz * invtau * Da_D * (1 / self.rho - 1 / RHO_I) / (R * self.Tz * alpha_D_z)
+
+        D = diffusivity_inst.deuterium(f_factor_version = self.c["alpha_D"])
         D[D<=0.0]=1.0e-20
         self.del_z = transient_solve_TR(z_edges_vec, z_P_vec, nt, self.dt, D, phi_0, nz_P, nz_fv, phi_s)
     elif self.c['iso'] == 'NoDiffusion':
         pass
-        
+
     # Solve for vertical isotope profile at this time step i
-    
+
     self.del_z = np.concatenate(([self.del_s[iii]], self.del_z[:-1]))
 
     return self.del_z

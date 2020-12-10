@@ -18,6 +18,14 @@ Changes history for diffusivity.py
 29042015: Added various parametrizations for ice diffusivity based on
           Ramseier, Delibaltas, Blicks, Sigfus. Everyting is in m2sec-1..!
 20082016: Added ice diffusivity parametrization for Itagaki100 m2sec-1
+
+20190305: Added Class TortuosityInv using parametrizations from Johnsen2000,
+          schwander1989 and witrant2012
+
+20190305: Porosity calculations
+
+20190305: Added tortuosity attribute in FirnDiffusivity class and linked the tau_inv to
+          the Class TortuosityInv
 #######################################################################################
 """
 from __future__ import division
@@ -26,6 +34,88 @@ import matplotlib.pylab as pl
 import os.path
 import sys
 
+
+class Porosity():
+
+    def __init__(self, rho_cl = 830.):
+        self.rho_ice = 917.
+        self.rho_cl = rho_cl
+        return
+
+    def s(self, rho):
+        return 1 - rho/self.rho_ice
+
+    def s_cl(self, rho):
+        # Schwander 1989 eq. 3
+        s_closed = self.s(rho)*np.exp(75*(rho/self.rho_cl - 1))
+        s_closed[rho>self.rho_cl] = self.s(rho)[rho>self.rho_cl]
+        return s_closed
+
+    def s_op(self, rho):
+        return self.s(rho) - self.s_cl(rho)
+
+    def show_all(self, rho):
+        a, x = plt.subplots(nrows=1, ncols=1, tight_layout = True)
+        x.plot(rho, self.s(rho))
+        x.plot(rho, self.s_op(rho))
+        x.plot(rho, self.s_cl(rho))
+        x.set_xlabel(r"Density [$\mathrm{kgm}^{-3}$]")
+        x.set_ylabel("Porosity")
+        return
+
+
+
+
+class TortuosityInv():
+    """
+    Watch out inversed tortuosities
+    """
+
+    def __init__(self, rho_cl = 830.):
+        self.rho_ice = 917.
+        self.rho_cl = rho_cl
+        return
+
+    def schwander1989(self, rho):
+        # Schwander 1989 eq. 5
+        por = Porosity()
+        s_open = por.s_op(rho)
+        return np.clip((1.7*s_open - 0.2), 0, None)
+
+    def johnsen2000(self, rho, rho_co = 804.3):
+        #Johnsen 2000 eq. 18
+        b = (self.rho_ice/rho_co)**2
+        return np.clip((1 - b*(rho/self.rho_ice)**2), 0, None)
+
+    def witrant2012(self, rho, temp, p):
+        # Witrant 2012 eq. 20
+        por = Porosity()
+        s_open = por.s_op(rho)
+        tau_inv = (2.5*s_open - 0.31)*(temp/273.15)**1.8*(p/101325.)
+        return np.clip(tau_inv, 0, None)
+
+    def show_all(self, rho):
+        por = Porosity()
+        a, x = plt.subplots(nrows=2, ncols=1, tight_layout = True)
+        x[0].plot(rho, por.s(rho)*self.schwander1989(rho), label = "Schwander 1989", \
+        color = "k", ls = "--", linewidth = 1)
+        x[0].plot(rho, por.s(rho)*self.witrant2012(rho, 245.15, 80000.), label = "Witrant 2012", \
+        color = "k", linewidth = 1, ls = "-.")
+        x[0].plot(rho, por.s(rho)*self.johnsen2000(rho), label = "Johnsen 2000", \
+        color = "k", linewidth = 1)
+        x[0].set_xlabel(r"Density [$\mathrm{kgm}^{-3}$]")
+        x[0].set_ylabel(r"$\left(1-\rho/\rho_{\mathrm{ice}}\right)/\tau$")
+        x[0].legend(frameon=False)
+        x[1].plot(por.s(rho), por.s(rho)*self.schwander1989(rho), \
+        label = "Schwander 1989", color = "k", ls = "--", linewidth = 1)
+        x[1].plot(por.s(rho), por.s(rho)*self.johnsen2000(rho), \
+        label = "Johnsen 2000", color = "k", linewidth = 1)
+        x[1].plot(por.s(rho), por.s(rho)*self.witrant2012(rho, 245.15, 66000.), label = "Witrant 2012", \
+        color = "k", linewidth = 1, ls = "-.")
+        x[1].set_xlabel("Porosity")
+        x[1].set_ylabel(r"$\left(1-\rho/\rho_{\mathrm{ice}}\right)/\tau$")
+        a.savefig("/Users/vasilis/Desktop/figure.eps")
+        return
 
 
 class FractionationFactor():
@@ -42,8 +132,9 @@ class FractionationFactor():
     def deuterium(self):
         alpha_D_Merlivat = 0.9098*np.exp(16288./(self.T**2)) #Merlivat Nief 1967
         alpha_D_Ellehoj = np.exp(0.2133 - 203.10/self.T + 48888./self.T**2)
+        alpha_D_Lamb = np.exp(13525/self.T**2 - 5.59e-2)
 
-        alpha_D = {"Merlivat": alpha_D_Merlivat, "Ellehoj": alpha_D_Ellehoj}
+        alpha_D = {"Merlivat": alpha_D_Merlivat, "Ellehoj": alpha_D_Ellehoj, "Lamb": alpha_D_Lamb}
         return alpha_D
 
     def o18(self):
@@ -113,6 +204,11 @@ class P_Ice():
         p_ice = 3.454e12*np.exp(-6133./T)
         return p_ice
 
+    def p_ice_dict(self, T):
+        return {"p_clausius_simple": self.clausius_clapeyron_simple(T = T),\
+        "p_clausius_Lt": self.clausius_clapeyron_Lt(T = T), \
+        "p_sigfus": self.sigfus_2000(T = T)}
+
 
 class P_Water():
     """
@@ -138,14 +234,31 @@ class P_Water():
 
 class FirnDiffusivity():
 
-    def __init__(self, rho, rho_co = 804.3, T = 218.5, P = 1):
+    def __init__(self, rho, rho_co = 804.3, T = 218.5, P = 1, p_ice_version = "sigfus_2000",\
+        tortuosity_version = "johnsen2000"):
         self.rho = rho
         self.rho_co = rho_co
         self.T = T
         self.P = P
+        self.P_pascal = self.P*1e6/9.8692
+
         self.f_factor_inst = FractionationFactor(T = self.T)
         self.air_dif_inst = AirDiffusivity(T = self.T, P = self.P)
-        self.sat_vap_pres = P_Ice().sigfus_2000(self.T)  #sat. vapor pressure Pa
+
+        if p_ice_version == "sigfus_2000":
+            self.sat_vap_pres = P_Ice().sigfus_2000(self.T)  #sat. vapor pressure Pa
+        elif p_ice_version == "p_clausius_simple":
+            self.sat_vap_pres = P_Ice().clausius_clapeyron_simple(self.T)  #sat. vapor pressure Pa
+        elif p_ice_version == "p_clausius_Lt":
+            self.sat_vap_pres = P_Ice().clausius_clapeyron_Lt(self.T)
+
+        if tortuosity_version == "johnsen2000":
+            self.tau_inv = TortuosityInv().johnsen2000(rho=self.rho, rho_co = self.rho_co)
+        elif tortuosity_version == "schwander1989":
+            self.tau_inv = TortuosityInv().schwander1989(rho=self.rho)
+        elif tortuosity_version == "witrant2012":
+            self.tau_inv = TortuosityInv().witrant2012(rho=self.rho, temp=self.T,\
+            p=self.P_pascal)
 
         return
 
@@ -166,16 +279,14 @@ class FirnDiffusivity():
             alpha_D = self.f_factor_inst.deuterium()["Merlivat"] #fractionation factor D Merlivat
         elif f_factor_version == "Ellehoj":
             alpha_D = self.f_factor_inst.deuterium()["Ellehoj"] #fractionation factor D Ellehoj
-        if f_factor_version not in ["Merlivat", "Ellehoj"]:
-            print("f_factor_version not in [Merlivat, Ellehoj]")
+        elif f_factor_version == "Lamb":
+            alpha_D = self.f_factor_inst.deuterium()["Lamb"] #fractionation factor D Lamb
+        if f_factor_version not in ["Merlivat", "Ellehoj", "Lamb"]:
+            print("f_factor_version not in [Merlivat, Ellehoj, Lamb]")
             sys.exit()
-        tau = 1./(1 - 1.3*(self.rho/rho_ice)**2)
-        inv_tau = np.clip(1./tau, 0, 1)
 
-        Df_D = (m*self.sat_vap_pres*Da_D*inv_tau)/(R*self.T*alpha_D)*\
+        Df_D = (m*self.sat_vap_pres*Da_D*self.tau_inv)/(R*self.T*alpha_D)*\
             (1./self.rho - 1./rho_ice)
-
-        # Df_D[set_zero_at] = 0
 
         return Df_D
 
@@ -200,13 +311,8 @@ class FirnDiffusivity():
             print("f_factor_version not in [Majoube, Ellehoj]")
             sys.exit()
 
-        tau = 1./(1 - 1.3*(self.rho/rho_ice)**2)
-        inv_tau = np.clip(1./tau, 0, 1)
-
-        Df_o18 = (m*self.sat_vap_pres*Da_o18*inv_tau)/(R*self.T*alpha_o18)*\
+        Df_o18 = (m*self.sat_vap_pres*Da_o18*self.tau_inv)/(R*self.T*alpha_o18)*\
             (1./self.rho - 1./rho_ice)
-
-        # Df_o18[set_zero_at] = 0
 
         return Df_o18  #m2sec-1
 
@@ -231,13 +337,8 @@ class FirnDiffusivity():
             print("f_factor_version not in [Majoube, Ellehoj]")
             sys.exit()
 
-        tau = 1./(1 - 1.3*(self.rho/rho_ice)**2)
-        inv_tau = np.clip(1./tau, 0, 1)
-
-        Df_o17 = (m*self.sat_vap_pres*Da_o17*inv_tau)/(R*self.T*alpha_o17)*\
+        Df_o17 = (m*self.sat_vap_pres*Da_o17*self.tau_inv)/(R*self.T*alpha_o17)*\
             (1./self.rho - 1./rho_ice)
-
-        # Df_o17[set_zero_at] = 0
 
         return Df_o17  #m2sec-1
 
@@ -277,8 +378,6 @@ class FirnDiffusivityFast():
         Df_D = (m*self.sat_vap_pres*Da_D*inv_tau)/(R*self.T*alpha_D)*\
             (1./self.rho - 1./rho_ice)
 
-        # Df_D[set_zero_at] = 0
-
         return Df_D
 
 
@@ -301,8 +400,6 @@ class FirnDiffusivityFast():
         Df_o18 = (m*self.sat_vap_pres*Da_o18*inv_tau)/(R*self.T*alpha_o18)*\
             (1./self.rho - 1./rho_ice)
 
-        # Df_o18[set_zero_at] = 0
-
         return Df_o18  #m2sec-1
 
 
@@ -324,8 +421,6 @@ class FirnDiffusivityFast():
 
         Df_o17 = (m*self.sat_vap_pres*Da_o17*inv_tau)/(R*self.T*alpha_o17)*\
             (1./self.rho - 1./rho_ice)
-
-        # Df_o17[set_zero_at] = 0
 
         return Df_o17  #m2sec-1
 

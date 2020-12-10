@@ -1,21 +1,39 @@
 {
     "AutoSpinUpTime": false,
     "D_surf": 1.0,
-    "H": 3405,
-    "HbaseSpin": 3100.0,
+    "H": 3400,
+    "HbaseSpin": 3100,
     "InputFileFolder": "modelInput",
     "InputFileNameIso": "CFM_age_isotope.csv",
-    "InputFileNameTemp": "cfm_mytests/cfm_my_forcings/temp_forcing_st_st.csv", 
-    "InputFileNamebdot": "cfm_mytests/cfm_my_forcings/accum_forcing_st_st.csv",
-    "P_atm": 0.7,
+    "InputFileNameTemp": "./cfm_mytests/cfm_my_forcings/fitter_forcing_temp.csv",
+    "InputFileNamebdot": "./cfm_mytests/cfm_my_forcings/fitter_forcing_accum.csv",
+    "P_atm": 0.77,
     "SeasonalTcycle": false,
     "TAmp": 10,
-    "TWriteInt": 100,
+    "TWriteInt": 10,
+    "_alpha_17_options": [
+        "Majoube",
+        "Ellehoj"
+    ],
+    "_alpha_18_options": [
+        "Majoube",
+        "Ellehoj"
+    ],
+    "_alpha_D_options": [
+        "Merlivat",
+        "Ellehoj",
+        "Lamb"
+    ],
     "_comment1": "bdot is in units of m ice equivalent. Is this strictly true? Should just make everything water...",
     "_isoOptions": [
         "18",
         "D",
         "NoDiffusion"
+    ],
+    "_p_ice_options": [
+        "sigfus_2000",
+        "p_clausius_simple",
+        "p_clausius_Lt"
     ],
     "_physRhoOptions": [
         "HLdynamic",
@@ -31,6 +49,14 @@
         "Morris2013",
         "\u2026"
     ],
+    "_tortuosity_options": [
+        "johnsen2000",
+        "schwander1989",
+        "witrant2012"
+    ],
+    "alpha_17": "Majoube",
+    "alpha_18": "Majoube",
+    "alpha_D": "Merlivat",
     "bdot0": 0.1,
     "bdot_options": [
         "instant",
@@ -42,21 +68,27 @@
     "heatDiff": true,
     "iso": "NoDiffusion",
     "isoDiff": false,
+    "p_ice": "sigfus_2000",
     "physGrain": false,
     "physRho": "Goujon2003",
     "plotsFolder": "Plots",
     "plotting": "on",
     "r2s0": 1e-08,
-    "resultsFileName": "steady_state_test_250_0_0_2_Goujon2003.hdf5",
-    "resultsFolder": "cfm_mytests/steady_state_test_results_temp/",
-    "rho_co_iso": 804.0,
-    "rhos0": 350.0,
+    "resultsFileName": "steady_state_newton_solver.hdf5",
+    "resultsFolder": "./cfm_mytests/steady_state_test_results_temp/",
+    "rho_co_iso": 804.3,
+<<<<<<< HEAD
+    "rhos0": 300.0,
+=======
+    "rhos0": 420.0,
+>>>>>>> 932e43cb294a31edf87e0be3e99cd01fccf7fecb
     "spacewriteint": 1,
     "spinFileName": "vastestsspinspin.hdf5",
     "stpsPerYear": 1.0,
     "stpsPerYearSpin": 1.0,
     "strain": false,
+    "tortuosity": "johnsen2000",
     "writehdf5": true,
     "yearSpin": 1000,
-    "years": 500.0
+    "years": 1000.0
 }

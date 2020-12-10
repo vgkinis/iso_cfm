@@ -1,6 +1,5 @@
 import csv
 import os
-from string import join
 import numpy as np
 import h5py
 
@@ -64,22 +63,24 @@ import h5py
 def write_nospin_hdf5(self):
 
     f4 = h5py.File(os.path.join(self.c['resultsFolder'], self.c['resultsFileName']),'w')
-    
+
     if 'density' in self.output_list:
         f4.create_dataset('density',data=self.rho_out)
+    if 'drho_dt' in self.output_list:
+        f4.create_dataset('drho_dt',data=self.drho_dt_out)
     if 'temperature' in self.output_list:
         f4.create_dataset('temperature',data=self.Tz_out)
     if 'age' in self.output_list:
         f4.create_dataset('age',data=self.age_out)
-    if 'depth' in self.output_list:    
+    if 'depth' in self.output_list:
         f4.create_dataset('depth',data=self.z_out)
-    if 'dcon' in self.output_list:    
+    if 'dcon' in self.output_list:
         f4.create_dataset('Dcon',data=self.D_out)
-    if 'bdot_mean' in self.output_list:    
+    if 'bdot_mean' in self.output_list:
         f4.create_dataset('bdot',data=self.bdot_out)
-    if 'climate' in self.output_list:    
+    if 'climate' in self.output_list:
         f4.create_dataset('Modelclimate',data=self.Clim_out)
-    if 'compaction_rate' in self.output_list:    
+    if 'compaction_rate' in self.output_list:
         f4.create_dataset('compaction_rate', data=self.crate_out)
     if 'iso_sigmaD' in self.output_list:
         f4.create_dataset('iso_sigmaD', data = self.iso_sigmaD_out)
@@ -87,16 +88,22 @@ def write_nospin_hdf5(self):
         f4.create_dataset('iso_sigma18', data = self.iso_sigma18_out)
     if 'iso_sigma17' in self.output_list:
         f4.create_dataset('iso_sigma17', data = self.iso_sigma17_out)
-    
+    if 'iso_dsigma2_dt_D' in self.output_list:
+        f4.create_dataset('iso_dsigma2_dt_D', data = self.iso_dsigma2_dt_D_out)
+    if 'iso_dsigma2_dt_18' in self.output_list:
+        f4.create_dataset('iso_dsigma2_dt_18', data = self.iso_dsigma2_dt_18_out)
+    if 'iso_dsigma2_dt_17' in self.output_list:
+        f4.create_dataset('iso_dsigma2_dt_17', data = self.iso_dsigma2_dt_17_out)
+
 
     # if self.c['physGrain']:
     if 'grainsize' in self.output_list:
         f4.create_dataset('r2',data=self.r2_out)
     # if self.THist:
-    if 'temp_Hx' in self.output_list:    
+    if 'temp_Hx' in self.output_list:
         f4.create_dataset('Hx',data=self.Hx_out)
     # if self.c['isoDiff']:
-    if 'isotopes' in self.output_list:    
+    if 'isotopes' in self.output_list:
         f4.create_dataset('isotopes',data=self.iso_out)
 
     # timewrite = np.append(self.modeltime[0],self.TWrite[:len(self.intPhiAll)])
@@ -107,11 +114,11 @@ def write_nospin_hdf5(self):
     if 'DIP' in self.output_list:
         f4.create_dataset('DIP',data = self.DIP_out)
 
-    # BCOwrite=np.vstack((timewrite, self.bcoAgeMartAll, self.bcoDepMartAll, self.bcoAge815All, self.bcoDep815All))    
+    # BCOwrite=np.vstack((timewrite, self.bcoAgeMartAll, self.bcoDepMartAll, self.bcoAge815All, self.bcoDep815All))
     if 'BCO' in self.output_list:
         f4.create_dataset('BCO',data = self.BCO_out)
 
-    # LIZwrite=np.vstack((timewrite, self.LIZAgeAll, self.LIZDepAll))    
+    # LIZwrite=np.vstack((timewrite, self.LIZAgeAll, self.LIZDepAll))
     if 'LIZ' in self.output_list:
         f4.create_dataset('LIZ',data = self.LIZ_out)
 
@@ -174,18 +181,24 @@ def write_nospin_hdf5(self):
 #             csvwriter = csv.writer(f)
 #             csvwriter.writerow(Hx_time)
 
-def write_spin_hdf5(folder, spinFileName, physGrain, THist, isoDiff, rho_time, Tz_time, age_time, z_time, \
-    iso_sigmaD_time, iso_sigma18_time, iso_sigma17_time, r2_time, Hx_time, iso_time):
+def write_spin_hdf5(folder, spinFileName, physGrain, THist, isoDiff, rho_time, drho_dt_time, \
+    Tz_time, age_time, z_time, iso_sigmaD_time, iso_sigma18_time, iso_sigma17_time, \
+    iso_dsigma2_dt_D_time, iso_dsigma2_dt_18_time, iso_dsigma2_dt_17_time,\
+    r2_time, Hx_time, iso_time):
 
     f5 = h5py.File(os.path.join(folder, spinFileName), 'w')
 
     f5.create_dataset('densitySpin', data = rho_time)
+    f5.create_dataset('drho_dtSpin', data = drho_dt_time)
     f5.create_dataset('tempSpin', data = Tz_time)
     f5.create_dataset('ageSpin', data = age_time)
     f5.create_dataset('depthSpin', data = z_time)
     f5.create_dataset('iso_sigmaD', data = iso_sigmaD_time)
     f5.create_dataset('iso_sigma18', data = iso_sigma18_time)
     f5.create_dataset('iso_sigma17', data = iso_sigma17_time)
+    f5.create_dataset('iso_dsigma2_dt_D', data = iso_dsigma2_dt_D_time)
+    f5.create_dataset('iso_dsigma2_dt_18', data = iso_dsigma2_dt_18_time)
+    f5.create_dataset('iso_dsigma2_dt_17', data = iso_dsigma2_dt_17_time)
     if physGrain:
         f5.create_dataset('r2Spin', data = r2_time)
     if THist:

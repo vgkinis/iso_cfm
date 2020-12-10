@@ -226,12 +226,13 @@ class Sigma2Prime():
         sigma18_2 = iso_sigma_dict["18"]**2
         sigma17_2 = iso_sigma_dict["17"]**2
 
-        diffusivity_inst = diffusivity_vas.FirnDiffusivityFast(rho = self.rho, rho_co = self.cd["rho_co_iso"], \
-            T = self.Tz, P = self.cd["P_atm"])
+        diffusivity_inst = diffusivity_vas.FirnDiffusivity(rho = self.rho, rho_co = self.cd["rho_co_iso"], \
+            T = self.Tz, P = self.cd["P_atm"], p_ice_version = self.cd["p_ice"], \
+            tortuosity_version = self.cd["tortuosity"])
 
-        dsigmaD_2_dt = 2*(diffusivity_inst.deuterium(f_factor_version = "Merlivat") - drho_dt*sigmaD_2/self.rho)
-        dsigma18_2_dt = 2*(diffusivity_inst.o18(f_factor_version = "Majoube") - drho_dt*sigma18_2/self.rho)
-        dsigma17_2_dt = 2*(diffusivity_inst.o17(f_factor_version = "Majoube") - drho_dt*sigma17_2/self.rho)
+        dsigmaD_2_dt = 2*(diffusivity_inst.deuterium(f_factor_version = self.cd["alpha_D"]) - drho_dt*sigmaD_2/self.rho)
+        dsigma18_2_dt = 2*(diffusivity_inst.o18(f_factor_version = self.cd["alpha_18"]) - drho_dt*sigma18_2/self.rho)
+        dsigma17_2_dt = 2*(diffusivity_inst.o17(f_factor_version = self.cd["alpha_17"]) - drho_dt*sigma17_2/self.rho)
 
         # dsigmaD_2_dt = diffusivity_inst.deuterium(f_factor_version = "Merlivat")/iso_sigma_dict['D'] - iso_sigma_dict['D']*drho_dt/self.rho
         # dsigma18_2_dt = diffusivity_inst.o18(f_factor_version = "Majoube")/iso_sigma_dict['18'] - iso_sigma_dict['18']*drho_dt/self.rho

@@ -2,15 +2,28 @@
     "AutoSpinUpTime": false,
     "D_surf": 1.0,
     "H": 3405,
-    "HbaseSpin": 3100.0,
+    "HbaseSpin": 3000,
     "InputFileFolder": "modelInput",
     "InputFileNameIso": "CFM_age_isotope.csv",
-    "InputFileNameTemp": "cfm_mytests/cfm_my_forcings/temp_forcing_st_st.csv", 
-    "InputFileNamebdot": "cfm_mytests/cfm_my_forcings/accum_forcing_st_st.csv",
+    "InputFileNameTemp": "cfm_mytests/cfm_my_forcings/temp_forcing_ramp.csv",
+    "InputFileNamebdot": "cfm_mytests/cfm_my_forcings/accum_forcing_ramp.csv",
     "P_atm": 0.7,
     "SeasonalTcycle": false,
-    "TAmp": 10,
-    "TWriteInt": 100,
+    "TAmp": 10.0,
+    "TWriteInt": 1,
+    "_alpha_17_options": [
+        "Majoube",
+        "Ellehoj"
+    ],
+    "_alpha_18_options": [
+        "Majoube",
+        "Ellehoj"
+    ],
+    "_alpha_D_options": [
+        "Merlivat",
+        "Ellehoj",
+        "Lamb"
+    ],
     "_comment1": "bdot is in units of m ice equivalent. Is this strictly true? Should just make everything water...",
     "_isoOptions": [
         "18",
@@ -31,8 +44,11 @@
         "Morris2013",
         "\u2026"
     ],
+    "alpha_17": "Majoube",
+    "alpha_18": "Majoube",
+    "alpha_D": "Merlivat",
     "bdot0": 0.1,
-    "bdot_options": [
+    "_bdot_options": [
         "instant",
         "mean"
     ],
@@ -43,12 +59,12 @@
     "iso": "NoDiffusion",
     "isoDiff": false,
     "physGrain": false,
-    "physRho": "Goujon2003",
+    "physRho": "HLdynamic",
     "plotsFolder": "Plots",
     "plotting": "on",
     "r2s0": 1e-08,
-    "resultsFileName": "steady_state_test_250_0_0_2_Goujon2003.hdf5",
-    "resultsFolder": "cfm_mytests/steady_state_test_results_temp/",
+    "resultsFileName": "ramp_fitter_results.hdf5",
+    "resultsFolder": "cfm_mytests/ramp_results_temp/",
     "rho_co_iso": 804.0,
     "rhos0": 350.0,
     "spacewriteint": 1,
